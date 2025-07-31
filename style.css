@@ -28,7 +28,16 @@ input[type="file"] {
 }
 
 #dropzone {
+  border: 2px dashed #999;
+  padding: 40px;
+  margin: 20px auto;
+  width: 80%;
+  background: #fff;
   transition: background 0.3s;
-  cursor: pointer;
+  color: #666;
 }
+#dropzone.dragover {
+  background-color: #f0f0f0;
+}
+
 
