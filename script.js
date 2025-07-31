@@ -6,18 +6,15 @@ const dropzone = document.getElementById("dropzone");
 let linksParaDownload = [];
 
 function processarArquivos(files) {
-  const validFiles = Array.from(files).slice(0, 10);
+  const imagens = Array.from(files).filter(file => file.type.startsWith("image/")).slice(0, 10);
+
+  if (imagens.length === 0) return;
 
   downloads.innerHTML = "";
   linksParaDownload = [];
   btnBaixarTudo.style.display = "none";
 
-  validFiles.forEach((file) => {
-    if (!file.type.startsWith("image/")) {
-      alert(`Arquivo ignorado: ${file.name} não é uma imagem.`);
-      return;
-    }
-
+  imagens.forEach((file) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
@@ -30,14 +27,13 @@ function processarArquivos(files) {
 
         canvas.toBlob((blob) => {
           const link = document.createElement("a");
-          const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
-          link.download = nomeArquivo;
+          link.download = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
           link.href = URL.createObjectURL(blob);
           link.textContent = `Download: ${link.download}`;
           downloads.appendChild(link);
           linksParaDownload.push(link);
 
-          if (linksParaDownload.length === validFiles.length) {
+          if (linksParaDownload.length === imagens.length) {
             btnBaixarTudo.style.display = "inline-block";
           }
         }, "image/jpeg", 0.8);
@@ -48,35 +44,41 @@ function processarArquivos(files) {
   });
 }
 
+// Input tradicional
 input.addEventListener("change", () => {
   processarArquivos(input.files);
 });
 
+// Baixar tudo
 btnBaixarTudo.addEventListener("click", () => {
-  linksParaDownload.forEach((link) => link.click());
+  linksParaDownload.forEach(link => link.click());
 });
 
 // Arrastar e soltar
 dropzone.addEventListener("dragover", (e) => {
   e.preventDefault();
-  dropzone.style.background = "#eee";
-});
-dropzone.addEventListener("dragleave", () => {
-  dropzone.style.background = "#fff";
-});
-dropzone.addEventListener("drop", (e) => {
-  e.preventDefault();
-  dropzone.style.background = "#fff";
-  processarArquivos(e.dataTransfer.files);
+  dropzone.classList.add("dragover");
 });
 
-// Colar imagens
+dropzone.addEventListener("dragleave", () => {
+  dropzone.classList.remove("dragover");
+});
+
+dropzone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropzone.classList.remove("dragover");
+  if (e.dataTransfer.files.length > 0) {
+    processarArquivos(e.dataTransfer.files);
+  }
+});
+
+// Colar imagens (Ctrl+V)
 window.addEventListener("paste", (e) => {
-  const items = e.clipboardData.items;
   const arquivos = [];
-  for (let item of items) {
+  for (const item of e.clipboardData.items) {
     if (item.type.startsWith("image/")) {
-      arquivos.push(item.getAsFile());
+      const file = item.getAsFile();
+      if (file) arquivos.push(file);
     }
   }
   if (arquivos.length > 0) {
