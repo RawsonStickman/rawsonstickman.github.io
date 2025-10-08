@@ -106,7 +106,7 @@ async function fazerUploadImagens() {
   listaLinks.innerHTML = "";
 
   // API Key pública do imgbb (você pode criar sua própria em https://api.imgbb.com/)
-  const API_KEY = "d0d1e3d3b6f6c1e6e1e3d3b6f6c1e6e1"; // Substitua por sua chave
+  const API_KEY = "be2bda19e98f53801c62094133672330"; // Substitua por sua chave
   
   const linksGerados = [];
 
