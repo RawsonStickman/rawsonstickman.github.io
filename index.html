@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Conversor PNG → JPG 80%</title>
+  <title>Conversor PNG → JPG 80% + Upload</title>
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -16,14 +16,29 @@
   
   <div class="downloads" id="downloads"></div>
   <button id="baixarTudo" style="display: none;">Baixar Tudo</button>
+  <button id="uploadTudo" style="display: none;">📤 Fazer Upload e Gerar Links</button>
+
+  <div class="loading" id="loading" style="display: none;">
+    <div class="spinner"></div>
+    <p>Fazendo upload das imagens...</p>
+  </div>
+
+  <div class="links-publicos" id="linksPublicos" style="display: none;">
+    <h3>🔗 Links Públicos (Use no ChatGPT)</h3>
+    <div id="listaLinks"></div>
+  </div>
 
   <div class="instrucoes" id="instrucoes" style="display: none;">
-    <h3>📌 Como copiar o link para usar no ChatGPT:</h3>
+    <h3>📌 Como usar os links no ChatGPT:</h3>
     <ol>
-      <li>Clique com o <strong>botão direito</strong> na imagem abaixo</li>
-      <li>Selecione <strong>"Copiar endereço do link"</strong> ou <strong>"Copiar link"</strong></li>
-      <li>Cole o link no ChatGPT</li>
+      <li>Clique no botão <strong>"📤 Fazer Upload e Gerar Links"</strong></li>
+      <li>Aguarde o upload das imagens</li>
+      <li>Copie os links públicos gerados</li>
+      <li>Cole os links no ChatGPT - eles funcionarão! ✅</li>
     </ol>
+    <div class="aviso">
+      ⚠️ <strong>Importante:</strong> Os links gerados são públicos e ficam disponíveis por tempo limitado (geralmente 24h-30 dias dependendo do serviço).
+    </div>
   </div>
 
   <script src="script.js"></script>
