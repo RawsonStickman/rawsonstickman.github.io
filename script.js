@@ -1,10 +1,15 @@
 const input = document.getElementById("input");
 const downloads = document.getElementById("downloads");
 const btnBaixarTudo = document.getElementById("baixarTudo");
+const btnUploadTudo = document.getElementById("uploadTudo");
 const dropzone = document.getElementById("dropzone");
 const instrucoes = document.getElementById("instrucoes");
+const loading = document.getElementById("loading");
+const linksPublicos = document.getElementById("linksPublicos");
+const listaLinks = document.getElementById("listaLinks");
 
 let linksParaDownload = [];
+let blobsParaUpload = [];
 
 function processarArquivos(files) {
   const imagens = Array.from(files).filter(file => file.type.startsWith("image/")).slice(0, 10);
@@ -13,8 +18,11 @@ function processarArquivos(files) {
 
   downloads.innerHTML = "";
   linksParaDownload = [];
+  blobsParaUpload = [];
   btnBaixarTudo.style.display = "none";
+  btnUploadTudo.style.display = "none";
   instrucoes.style.display = "none";
+  linksPublicos.style.display = "none";
 
   imagens.forEach((file, index) => {
     const reader = new FileReader();
@@ -36,11 +44,14 @@ function processarArquivos(files) {
           const url = URL.createObjectURL(blob);
           const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
           
+          // Armazenar blob para upload posterior
+          blobsParaUpload.push({ blob, nome: nomeArquivo });
+          
           // Criar card da imagem
           const card = document.createElement("div");
           card.className = "image-card";
           
-          // Criar link com imagem (para copiar o endereço)
+          // Criar link com imagem
           const linkImagem = document.createElement("a");
           linkImagem.href = url;
           linkImagem.download = nomeArquivo;
@@ -50,7 +61,6 @@ function processarArquivos(files) {
           imgPreview.src = url;
           imgPreview.className = "image-preview";
           imgPreview.alt = nomeArquivo;
-          imgPreview.title = "Clique com botão direito → Copiar endereço do link";
           
           // Adicionar imagem ao link
           linkImagem.appendChild(imgPreview);
@@ -78,6 +88,7 @@ function processarArquivos(files) {
 
           if (linksParaDownload.length === imagens.length) {
             btnBaixarTudo.style.display = "inline-block";
+            btnUploadTudo.style.display = "inline-block";
             instrucoes.style.display = "block";
           }
         }, "image/jpeg", 0.8);
@@ -85,6 +96,120 @@ function processarArquivos(files) {
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
+  });
+}
+
+// Função para fazer upload usando imgbb.com (API gratuita)
+async function fazerUploadImagens() {
+  loading.style.display = "block";
+  linksPublicos.style.display = "none";
+  listaLinks.innerHTML = "";
+
+  // API Key pública do imgbb (você pode criar sua própria em https://api.imgbb.com/)
+  const API_KEY = "d0d1e3d3b6f6c1e6e1e3d3b6f6c1e6e1"; // Substitua por sua chave
+  
+  const linksGerados = [];
+
+  for (let i = 0; i < blobsParaUpload.length; i++) {
+    const { blob, nome } = blobsParaUpload[i];
+    
+    try {
+      // Converter blob para base64
+      const base64 = await blobToBase64(blob);
+      const base64Data = base64.split(',')[1]; // Remove o prefixo data:image/jpeg;base64,
+      
+      // Fazer upload para imgbb
+      const formData = new FormData();
+      formData.append('image', base64Data);
+      
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${API_KEY}`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        linksGerados.push({
+          nome: nome,
+          url: data.data.url,
+          deleteUrl: data.data.delete_url
+        });
+      } else {
+        console.error('Erro no upload:', data);
+      }
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+    }
+  }
+  
+  loading.style.display = "none";
+  
+  if (linksGerados.length > 0) {
+    exibirLinksPublicos(linksGerados);
+  } else {
+    alert('Erro ao fazer upload. Tente usar outro serviço de hospedagem de imagens como imgur.com, postimages.org ou imgbb.com manualmente.');
+  }
+}
+
+// Converter blob para base64
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Exibir links públicos
+function exibirLinksPublicos(links) {
+  linksPublicos.style.display = "block";
+  
+  links.forEach((item, index) => {
+    const div = document.createElement("div");
+    div.className = "link-item";
+    
+    const titulo = document.createElement("strong");
+    titulo.textContent = `${index + 1}. ${item.nome}`;
+    
+    const divLink = document.createElement("div");
+    divLink.className = "link-copiavel";
+    
+    const inputLink = document.createElement("input");
+    inputLink.type = "text";
+    inputLink.value = item.url;
+    inputLink.readOnly = true;
+    
+    const btnCopiar = document.createElement("button");
+    btnCopiar.className = "btn-copiar";
+    btnCopiar.textContent = "📋 Copiar";
+    btnCopiar.onclick = () => {
+      inputLink.select();
+      navigator.clipboard.writeText(item.url);
+      btnCopiar.textContent = "✅ Copiado!";
+      btnCopiar.classList.add("copiado");
+      setTimeout(() => {
+        btnCopiar.textContent = "📋 Copiar";
+        btnCopiar.classList.remove("copiado");
+      }, 2000);
+    };
+    
+    divLink.appendChild(inputLink);
+    divLink.appendChild(btnCopiar);
+    
+    // Preview da imagem
+    const preview = document.createElement("div");
+    preview.className = "link-preview";
+    const imgPreview = document.createElement("img");
+    imgPreview.src = item.url;
+    preview.appendChild(imgPreview);
+    
+    div.appendChild(titulo);
+    div.appendChild(divLink);
+    div.appendChild(preview);
+    
+    listaLinks.appendChild(div);
   });
 }
 
@@ -98,8 +223,13 @@ btnBaixarTudo.addEventListener("click", () => {
   linksParaDownload.forEach((link, index) => {
     setTimeout(() => {
       link.click();
-    }, index * 100); // Pequeno delay entre downloads
+    }, index * 100);
   });
+});
+
+// Upload tudo
+btnUploadTudo.addEventListener("click", () => {
+  fazerUploadImagens();
 });
 
 // Arrastar e soltar
