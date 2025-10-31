@@ -133,3 +133,137 @@ function criarCardImagem(url, nomeArquivo, blob, largura, altura) {
 
   return card;
 }
+
+function mostrarBotoes() {
+  btnBaixarTudo.style.display = "inline-block";
+  btnUploadTudo.style.display = "inline-block";
+  instrucoes.style.display = "block";
+}
+
+// Upload para imgbb
+async function fazerUploadImagens() {
+  loading.style.display = "block";
+  linksPublicos.style.display = "none";
+  listaLinks.innerHTML = "";
+
+  const API_KEY = "be2bda19e98f53801c62094133672330"; 
+  const linksGerados = [];
+
+  for (let i = 0; i < blobsParaUpload.length; i++) {
+    const { blob, nome } = blobsParaUpload[i];
+    try {
+      const base64 = await blobToBase64(blob);
+      const base64Data = base64.split(',')[1];
+      const formData = new FormData();
+      formData.append('image', base64Data);
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${API_KEY}`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await response.json();
+      if (data.success) {
+        linksGerados.push({
+          nome,
+          url: data.data.url,
+          deleteUrl: data.data.delete_url
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+    }
+  }
+
+  loading.style.display = "none";
+  if (linksGerados.length > 0) exibirLinksPublicos(linksGerados);
+  else alert('Erro ao fazer upload. Tente outro serviço como imgur.com.');
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function exibirLinksPublicos(links) {
+  linksPublicos.style.display = "block";
+  links.forEach((item, index) => {
+    const div = document.createElement("div");
+    div.className = "link-item";
+
+    const titulo = document.createElement("strong");
+    titulo.textContent = `${index + 1}. ${item.nome}`;
+
+    const divLink = document.createElement("div");
+    divLink.className = "link-copiavel";
+
+    const inputLink = document.createElement("input");
+    inputLink.type = "text";
+    inputLink.value = item.url;
+    inputLink.readOnly = true;
+
+    const btnCopiar = document.createElement("button");
+    btnCopiar.className = "btn-copiar";
+    btnCopiar.textContent = "📋 Copiar";
+    btnCopiar.onclick = () => {
+      inputLink.select();
+      navigator.clipboard.writeText(item.url);
+      btnCopiar.textContent = "✅ Copiado!";
+      btnCopiar.classList.add("copiado");
+      setTimeout(() => {
+        btnCopiar.textContent = "📋 Copiar";
+        btnCopiar.classList.remove("copiado");
+      }, 2000);
+    };
+
+    divLink.appendChild(inputLink);
+    divLink.appendChild(btnCopiar);
+
+    const preview = document.createElement("div");
+    preview.className = "link-preview";
+    const imgPreview = document.createElement("img");
+    imgPreview.src = item.url;
+    preview.appendChild(imgPreview);
+
+    div.appendChild(titulo);
+    div.appendChild(divLink);
+    div.appendChild(preview);
+    listaLinks.appendChild(div);
+  });
+}
+
+input.addEventListener("change", () => processarArquivos(input.files));
+
+btnBaixarTudo.addEventListener("click", () => {
+  linksParaDownload.forEach((link, index) => setTimeout(() => link.click(), index * 100));
+});
+
+btnUploadTudo.addEventListener("click", () => fazerUploadImagens());
+
+dropzone.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  dropzone.classList.add("dragover");
+});
+
+dropzone.addEventListener("dragleave", () => {
+  dropzone.classList.remove("dragover");
+});
+
+dropzone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropzone.classList.remove("dragover");
+  if (e.dataTransfer.files.length > 0) processarArquivos(e.dataTransfer.files);
+});
+
+window.addEventListener("paste", (e) => {
+  const arquivos = [];
+  for (const item of e.clipboardData.items) {
+    if (item.type.startsWith("image/")) {
+      const file = item.getAsFile();
+      if (file) arquivos.push(file);
+    }
+  }
+  if (arquivos.length > 0) processarArquivos(arquivos);
+});
