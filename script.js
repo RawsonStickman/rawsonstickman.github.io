@@ -26,240 +26,127 @@ function processarArquivos(files) {
 
   imagens.forEach((file, index) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d");
 
-        // Fundo branco para PNGs transparentes
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+if (file.name.toLowerCase().endsWith(".tif") || file.name.toLowerCase().endsWith(".tiff")) {
+  // Ler como ArrayBuffer para TIFF
+  reader.onload = (e) => {
+    const buffer = e.target.result;
+    const ifds = UTIF.decode(buffer);
+    UTIF.decodeImages(buffer, ifds);
+    const rgba = UTIF.toRGBA8(ifds[0]);
 
-        ctx.drawImage(img, 0, 0);
+    const canvas = document.createElement("canvas");
+    canvas.width = ifds[0].width;
+    canvas.height = ifds[0].height;
+    const ctx = canvas.getContext("2d");
+    const imageData = ctx.createImageData(ifds[0].width, ifds[0].height);
+    imageData.data.set(rgba);
+    ctx.putImageData(imageData, 0, 0);
 
-        canvas.toBlob((blob) => {
-          const url = URL.createObjectURL(blob);
-          const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
-          
-          // Armazenar blob para upload posterior
-          blobsParaUpload.push({ blob, nome: nomeArquivo });
-          
-          // Criar card da imagem
-          const card = document.createElement("div");
-          card.className = "image-card";
-          
-          // Criar link com imagem
-          const linkImagem = document.createElement("a");
-          linkImagem.href = url;
-          linkImagem.download = nomeArquivo;
-          
-          // Criar elemento de imagem
-          const imgPreview = document.createElement("img");
-          imgPreview.src = url;
-          imgPreview.className = "image-preview";
-          imgPreview.alt = nomeArquivo;
-          
-          // Adicionar imagem ao link
-          linkImagem.appendChild(imgPreview);
-          
-          // Criar botão de download
-          const linkDownload = document.createElement("a");
-          linkDownload.href = url;
-          linkDownload.download = nomeArquivo;
-          linkDownload.className = "image-link";
-          linkDownload.textContent = `⬇️ ${nomeArquivo}`;
-          
-          // Informações da imagem
-          const info = document.createElement("div");
-          info.className = "image-info";
-          const tamanhoKB = (blob.size / 1024).toFixed(2);
-          info.textContent = `${img.width}x${img.height} • ${tamanhoKB} KB`;
-          
-          // Montar o card
-          card.appendChild(linkImagem);
-          card.appendChild(linkDownload);
-          card.appendChild(info);
-          
-          downloads.appendChild(card);
-          linksParaDownload.push(linkDownload);
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
 
-          if (linksParaDownload.length === imagens.length) {
-            btnBaixarTudo.style.display = "inline-block";
-            btnUploadTudo.style.display = "inline-block";
-            instrucoes.style.display = "block";
-          }
-        }, "image/jpeg", 0.8);
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
+      blobsParaUpload.push({ blob, nome: nomeArquivo });
 
-// Função para fazer upload usando imgbb.com (API gratuita)
-async function fazerUploadImagens() {
-  loading.style.display = "block";
-  linksPublicos.style.display = "none";
-  listaLinks.innerHTML = "";
+      const card = document.createElement("div");
+      card.className = "image-card";
 
-  // API Key pública do imgbb (você pode criar sua própria em https://api.imgbb.com/)
-  const API_KEY = "be2bda19e98f53801c62094133672330"; // Substitua por sua chave
-  
-  const linksGerados = [];
+      const linkImagem = document.createElement("a");
+      linkImagem.href = url;
+      linkImagem.download = nomeArquivo;
 
-  for (let i = 0; i < blobsParaUpload.length; i++) {
-    const { blob, nome } = blobsParaUpload[i];
-    
-    try {
-      // Converter blob para base64
-      const base64 = await blobToBase64(blob);
-      const base64Data = base64.split(',')[1]; // Remove o prefixo data:image/jpeg;base64,
-      
-      // Fazer upload para imgbb
-      const formData = new FormData();
-      formData.append('image', base64Data);
-      
-      const response = await fetch(`https://api.imgbb.com/1/upload?key=${API_KEY}`, {
-        method: 'POST',
-        body: formData
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        linksGerados.push({
-          nome: nome,
-          url: data.data.url,
-          deleteUrl: data.data.delete_url
-        });
-      } else {
-        console.error('Erro no upload:', data);
+      const imgPreview = document.createElement("img");
+      imgPreview.src = url;
+      imgPreview.className = "image-preview";
+      imgPreview.alt = nomeArquivo;
+
+      linkImagem.appendChild(imgPreview);
+
+      const linkDownload = document.createElement("a");
+      linkDownload.href = url;
+      linkDownload.download = nomeArquivo;
+      linkDownload.className = "image-link";
+      linkDownload.textContent = `⬇️ ${nomeArquivo}`;
+
+      const info = document.createElement("div");
+      info.className = "image-info";
+      const tamanhoKB = (blob.size / 1024).toFixed(2);
+      info.textContent = `${canvas.width}x${canvas.height} • ${tamanhoKB} KB`;
+
+      card.appendChild(linkImagem);
+      card.appendChild(linkDownload);
+      card.appendChild(info);
+      downloads.appendChild(card);
+
+      linksParaDownload.push(linkDownload);
+
+      if (linksParaDownload.length === imagens.length) {
+        btnBaixarTudo.style.display = "inline-block";
+        btnUploadTudo.style.display = "inline-block";
+        instrucoes.style.display = "block";
       }
-    } catch (error) {
-      console.error('Erro ao fazer upload:', error);
-    }
-  }
-  
-  loading.style.display = "none";
-  
-  if (linksGerados.length > 0) {
-    exibirLinksPublicos(linksGerados);
-  } else {
-    alert('Erro ao fazer upload. Tente usar outro serviço de hospedagem de imagens como imgur.com, postimages.org ou imgbb.com manualmente.');
-  }
-}
+    }, "image/jpeg", 0.8);
+  };
+  reader.readAsArrayBuffer(file);
+} else {
+  // comportamento padrão para PNG/JPG
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
 
-// Converter blob para base64
-function blobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+        blobsParaUpload.push({ blob, nome: nomeArquivo });
 
-// Exibir links públicos
-function exibirLinksPublicos(links) {
-  linksPublicos.style.display = "block";
-  
-  links.forEach((item, index) => {
-    const div = document.createElement("div");
-    div.className = "link-item";
-    
-    const titulo = document.createElement("strong");
-    titulo.textContent = `${index + 1}. ${item.nome}`;
-    
-    const divLink = document.createElement("div");
-    divLink.className = "link-copiavel";
-    
-    const inputLink = document.createElement("input");
-    inputLink.type = "text";
-    inputLink.value = item.url;
-    inputLink.readOnly = true;
-    
-    const btnCopiar = document.createElement("button");
-    btnCopiar.className = "btn-copiar";
-    btnCopiar.textContent = "📋 Copiar";
-    btnCopiar.onclick = () => {
-      inputLink.select();
-      navigator.clipboard.writeText(item.url);
-      btnCopiar.textContent = "✅ Copiado!";
-      btnCopiar.classList.add("copiado");
-      setTimeout(() => {
-        btnCopiar.textContent = "📋 Copiar";
-        btnCopiar.classList.remove("copiado");
-      }, 2000);
+        const card = document.createElement("div");
+        card.className = "image-card";
+
+        const linkImagem = document.createElement("a");
+        linkImagem.href = url;
+        linkImagem.download = nomeArquivo;
+
+        const imgPreview = document.createElement("img");
+        imgPreview.src = url;
+        imgPreview.className = "image-preview";
+        imgPreview.alt = nomeArquivo;
+
+        linkImagem.appendChild(imgPreview);
+
+        const linkDownload = document.createElement("a");
+        linkDownload.href = url;
+        linkDownload.download = nomeArquivo;
+        linkDownload.className = "image-link";
+        linkDownload.textContent = `⬇️ ${nomeArquivo}`;
+
+        const info = document.createElement("div");
+        info.className = "image-info";
+        const tamanhoKB = (blob.size / 1024).toFixed(2);
+        info.textContent = `${img.width}x${img.height} • ${tamanhoKB} KB`;
+
+        card.appendChild(linkImagem);
+        card.appendChild(linkDownload);
+        card.appendChild(info);
+        downloads.appendChild(card);
+
+        linksParaDownload.push(linkDownload);
+
+        if (linksParaDownload.length === imagens.length) {
+          btnBaixarTudo.style.display = "inline-block";
+          btnUploadTudo.style.display = "inline-block";
+          instrucoes.style.display = "block";
+        }
+      }, "image/jpeg", 0.8);
     };
-    
-    divLink.appendChild(inputLink);
-    divLink.appendChild(btnCopiar);
-    
-    // Preview da imagem
-    const preview = document.createElement("div");
-    preview.className = "link-preview";
-    const imgPreview = document.createElement("img");
-    imgPreview.src = item.url;
-    preview.appendChild(imgPreview);
-    
-    div.appendChild(titulo);
-    div.appendChild(divLink);
-    div.appendChild(preview);
-    
-    listaLinks.appendChild(div);
-  });
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
-
-// Input tradicional
-input.addEventListener("change", () => {
-  processarArquivos(input.files);
-});
-
-// Baixar tudo
-btnBaixarTudo.addEventListener("click", () => {
-  linksParaDownload.forEach((link, index) => {
-    setTimeout(() => {
-      link.click();
-    }, index * 100);
-  });
-});
-
-// Upload tudo
-btnUploadTudo.addEventListener("click", () => {
-  fazerUploadImagens();
-});
-
-// Arrastar e soltar
-dropzone.addEventListener("dragover", (e) => {
-  e.preventDefault();
-  dropzone.classList.add("dragover");
-});
-
-dropzone.addEventListener("dragleave", () => {
-  dropzone.classList.remove("dragover");
-});
-
-dropzone.addEventListener("drop", (e) => {
-  e.preventDefault();
-  dropzone.classList.remove("dragover");
-  if (e.dataTransfer.files.length > 0) {
-    processarArquivos(e.dataTransfer.files);
-  }
-});
-
-// Colar imagens (Ctrl+V)
-window.addEventListener("paste", (e) => {
-  const arquivos = [];
-  for (const item of e.clipboardData.items) {
-    if (item.type.startsWith("image/")) {
-      const file = item.getAsFile();
-      if (file) arquivos.push(file);
-    }
-  }
-  if (arquivos.length > 0) {
-    processarArquivos(arquivos);
-  }
-});
