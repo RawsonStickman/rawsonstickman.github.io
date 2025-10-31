@@ -11,7 +11,7 @@ const listaLinks = document.getElementById("listaLinks");
 let linksParaDownload = [];
 let blobsParaUpload = [];
 
-// Processa imagens + TIFF
+// Processa os arquivos selecionados ou arrastados
 function processarArquivos(files) {
   const imagens = Array.from(files)
     .filter(file =>
@@ -21,7 +21,7 @@ function processarArquivos(files) {
     )
     .slice(0, 10);
 
-  if (!imagens.length) return;
+  if (imagens.length === 0) return;
 
   downloads.innerHTML = "";
   linksParaDownload = [];
@@ -31,17 +31,22 @@ function processarArquivos(files) {
   instrucoes.style.display = "none";
   linksPublicos.style.display = "none";
 
-  imagens.forEach(file => {
+  imagens.forEach((file) => {
     const reader = new FileReader();
     const isTiff = file.name.toLowerCase().endsWith(".tif") || file.name.toLowerCase().endsWith(".tiff");
 
-    reader.onload = e => {
+    reader.onload = (e) => {
+      const buffer = e.target.result;
+
       if (isTiff) {
         try {
-          const tiff = new Tiff({ buffer: e.target.result });
+          const tiff = new Tiff({ buffer });
           const canvas = tiff.toCanvas();
-          if (!canvas) return alert(`Não foi possível abrir ${file.name}`);
-          canvas.toBlob(blob => {
+          if (!canvas) {
+            alert(`Não foi possível abrir o arquivo ${file.name}. Pode estar corrompido ou usar compressão não suportada.`);
+            return;
+          }
+          canvas.toBlob((blob) => {
             const url = URL.createObjectURL(blob);
             const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
             blobsParaUpload.push({ blob, nome: nomeArquivo });
@@ -82,6 +87,7 @@ function processarArquivos(files) {
   });
 }
 
+// Cria o card de cada imagem
 function criarCardImagem(url, nomeArquivo, blob, largura, altura) {
   const card = document.createElement("div");
   card.className = "image-card";
@@ -120,11 +126,25 @@ function mostrarBotoes() {
   instrucoes.style.display = "block";
 }
 
-// Eventos
-input.addEventListener("change", () => processarArquivos(input.files));
-dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
-dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
-dropzone.addEventListener("drop", e => { e.preventDefault(); dropzone.classList.remove("dragover"); processarArquivos(e.dataTransfer.files); });
+// Drag & Drop
+dropzone.addEventListener("dragover", e => { 
+  e.preventDefault(); 
+  e.stopPropagation(); 
+  dropzone.classList.add("dragover"); 
+});
+dropzone.addEventListener("dragleave", e => { 
+  e.preventDefault(); 
+  e.stopPropagation(); 
+  dropzone.classList.remove("dragover"); 
+});
+dropzone.addEventListener("drop", e => { 
+  e.preventDefault(); 
+  e.stopPropagation(); 
+  dropzone.classList.remove("dragover"); 
+  if (e.dataTransfer.files.length > 0) processarArquivos(e.dataTransfer.files); 
+});
+
+// Ctrl+V
 window.addEventListener("paste", e => {
   const arquivos = [];
   for (const item of e.clipboardData.items) {
@@ -136,12 +156,15 @@ window.addEventListener("paste", e => {
   if (arquivos.length > 0) processarArquivos(arquivos);
 });
 
+// Seleção via input
+input.addEventListener("change", () => processarArquivos(input.files));
+
 // Baixar todas as imagens
 btnBaixarTudo.addEventListener("click", () => {
   linksParaDownload.forEach((link, i) => setTimeout(() => link.click(), i * 100));
 });
 
-// Função de upload e exibição de links (imgbb)
+// Upload para imgbb
 btnUploadTudo.addEventListener("click", async () => {
   loading.style.display = "block";
   linksPublicos.style.display = "none";
@@ -159,9 +182,7 @@ btnUploadTudo.addEventListener("click", async () => {
       formData.append('image', base64Data);
       const response = await fetch(`https://api.imgbb.com/1/upload?key=${API_KEY}`, { method: 'POST', body: formData });
       const data = await response.json();
-      if (data.success) {
-        linksGerados.push({ nome, url: data.data.url, deleteUrl: data.data.delete_url });
-      }
+      if (data.success) linksGerados.push({ nome, url: data.data.url, deleteUrl: data.data.delete_url });
     } catch (error) { console.error('Erro ao fazer upload:', error); }
   }
 
@@ -179,6 +200,7 @@ function blobToBase64(blob) {
   });
 }
 
+// Exibir links públicos
 function exibirLinksPublicos(links) {
   linksPublicos.style.display = "block";
   listaLinks.innerHTML = "";
