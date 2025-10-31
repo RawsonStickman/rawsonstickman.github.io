@@ -11,7 +11,12 @@ const listaLinks = document.getElementById("listaLinks");
 let linksParaDownload = [];
 let blobsParaUpload = [];
 
-// Processa os arquivos selecionados ou arrastados
+// Garante compatibilidade com TIFF
+const TiffLib = window.Tiff;
+if (!TiffLib) {
+  alert("Biblioteca TIFF não carregada. Verifique o script.js e a importação do tiff.min.js");
+}
+
 function processarArquivos(files) {
   const imagens = Array.from(files)
     .filter(file =>
@@ -31,22 +36,23 @@ function processarArquivos(files) {
   instrucoes.style.display = "none";
   linksPublicos.style.display = "none";
 
-  imagens.forEach((file) => {
+  imagens.forEach(file => {
     const reader = new FileReader();
     const isTiff = file.name.toLowerCase().endsWith(".tif") || file.name.toLowerCase().endsWith(".tiff");
 
     reader.onload = (e) => {
-      const buffer = e.target.result;
-
       if (isTiff) {
         try {
-          const tiff = new Tiff({ buffer });
+          const buffer = e.target.result;
+          const tiff = new TiffLib({ buffer });
           const canvas = tiff.toCanvas();
+
           if (!canvas) {
             alert(`Não foi possível abrir o arquivo ${file.name}. Pode estar corrompido ou usar compressão não suportada.`);
             return;
           }
-          canvas.toBlob((blob) => {
+
+          canvas.toBlob(blob => {
             const url = URL.createObjectURL(blob);
             const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
             blobsParaUpload.push({ blob, nome: nomeArquivo });
@@ -55,6 +61,7 @@ function processarArquivos(files) {
             linksParaDownload.push(card.querySelector(".image-link"));
             if (linksParaDownload.length === imagens.length) mostrarBotoes();
           }, "image/jpeg", 0.8);
+
         } catch (err) {
           alert(`Erro ao processar ${file.name}: ${err.message}`);
         }
@@ -68,6 +75,7 @@ function processarArquivos(files) {
           ctx.fillStyle = "white";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0);
+
           canvas.toBlob(blob => {
             const url = URL.createObjectURL(blob);
             const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
@@ -87,7 +95,6 @@ function processarArquivos(files) {
   });
 }
 
-// Cria o card de cada imagem
 function criarCardImagem(url, nomeArquivo, blob, largura, altura) {
   const card = document.createElement("div");
   card.className = "image-card";
@@ -100,7 +107,6 @@ function criarCardImagem(url, nomeArquivo, blob, largura, altura) {
   imgPreview.src = url;
   imgPreview.className = "image-preview";
   imgPreview.alt = nomeArquivo;
-
   linkImagem.appendChild(imgPreview);
 
   const linkDownload = document.createElement("a");
@@ -126,70 +132,39 @@ function mostrarBotoes() {
   instrucoes.style.display = "block";
 }
 
-// Drag & Drop
-dropzone.addEventListener("dragover", e => { 
-  e.preventDefault(); 
-  e.stopPropagation(); 
-  dropzone.classList.add("dragover"); 
-});
-dropzone.addEventListener("dragleave", e => { 
-  e.preventDefault(); 
-  e.stopPropagation(); 
-  dropzone.classList.remove("dragover"); 
-});
-dropzone.addEventListener("drop", e => { 
-  e.preventDefault(); 
-  e.stopPropagation(); 
-  dropzone.classList.remove("dragover"); 
-  if (e.dataTransfer.files.length > 0) processarArquivos(e.dataTransfer.files); 
-});
-
-// Ctrl+V
-window.addEventListener("paste", e => {
-  const arquivos = [];
-  for (const item of e.clipboardData.items) {
-    if (item.type.startsWith("image/")) {
-      const file = item.getAsFile();
-      if (file) arquivos.push(file);
-    }
-  }
-  if (arquivos.length > 0) processarArquivos(arquivos);
-});
-
-// Seleção via input
-input.addEventListener("change", () => processarArquivos(input.files));
-
-// Baixar todas as imagens
-btnBaixarTudo.addEventListener("click", () => {
-  linksParaDownload.forEach((link, i) => setTimeout(() => link.click(), i * 100));
-});
-
 // Upload para imgbb
-btnUploadTudo.addEventListener("click", async () => {
+async function fazerUploadImagens() {
   loading.style.display = "block";
   linksPublicos.style.display = "none";
   listaLinks.innerHTML = "";
 
-  const API_KEY = "be2bda19e98f53801c62094133672330"; 
+  const API_KEY = "be2bda19e98f53801c62094133672330";
   const linksGerados = [];
 
   for (let i = 0; i < blobsParaUpload.length; i++) {
     const { blob, nome } = blobsParaUpload[i];
     try {
       const base64 = await blobToBase64(blob);
-      const base64Data = base64.split(',')[1];
+      const base64Data = base64.split(",")[1];
       const formData = new FormData();
-      formData.append('image', base64Data);
-      const response = await fetch(`https://api.imgbb.com/1/upload?key=${API_KEY}`, { method: 'POST', body: formData });
+      formData.append("image", base64Data);
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${API_KEY}`, {
+        method: "POST",
+        body: formData
+      });
       const data = await response.json();
-      if (data.success) linksGerados.push({ nome, url: data.data.url, deleteUrl: data.data.delete_url });
-    } catch (error) { console.error('Erro ao fazer upload:', error); }
+      if (data.success) {
+        linksGerados.push({ nome, url: data.data.url, deleteUrl: data.data.delete_url });
+      }
+    } catch (error) {
+      console.error("Erro ao fazer upload:", error);
+    }
   }
 
   loading.style.display = "none";
   if (linksGerados.length > 0) exibirLinksPublicos(linksGerados);
-  else alert('Erro ao fazer upload. Tente outro serviço.');
-});
+  else alert("Erro ao fazer upload. Tente outro serviço como imgur.com.");
+}
 
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
@@ -200,10 +175,10 @@ function blobToBase64(blob) {
   });
 }
 
-// Exibir links públicos
 function exibirLinksPublicos(links) {
   linksPublicos.style.display = "block";
   listaLinks.innerHTML = "";
+
   links.forEach((item, index) => {
     const div = document.createElement("div");
     div.className = "link-item";
@@ -227,7 +202,10 @@ function exibirLinksPublicos(links) {
       navigator.clipboard.writeText(item.url);
       btnCopiar.textContent = "✅ Copiado!";
       btnCopiar.classList.add("copiado");
-      setTimeout(() => { btnCopiar.textContent = "📋 Copiar"; btnCopiar.classList.remove("copiado"); }, 2000);
+      setTimeout(() => {
+        btnCopiar.textContent = "📋 Copiar";
+        btnCopiar.classList.remove("copiado");
+      }, 2000);
     };
 
     divLink.appendChild(inputLink);
@@ -245,3 +223,29 @@ function exibirLinksPublicos(links) {
     listaLinks.appendChild(div);
   });
 }
+
+// Eventos
+input.addEventListener("change", () => processarArquivos(input.files));
+btnBaixarTudo.addEventListener("click", () => linksParaDownload.forEach((link, i) => setTimeout(() => link.click(), i * 100)));
+btnUploadTudo.addEventListener("click", fazerUploadImagens);
+
+// Drag & drop
+dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
+dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+dropzone.addEventListener("drop", e => {
+  e.preventDefault();
+  dropzone.classList.remove("dragover");
+  if (e.dataTransfer.files.length > 0) processarArquivos(e.dataTransfer.files);
+});
+
+// Colar imagens (Ctrl+V)
+window.addEventListener("paste", e => {
+  const arquivos = [];
+  for (const item of e.clipboardData.items) {
+    if (item.type.startsWith("image/")) {
+      const file = item.getAsFile();
+      if (file) arquivos.push(file);
+    }
+  }
+  if (arquivos.length > 0) processarArquivos(arquivos);
+});
