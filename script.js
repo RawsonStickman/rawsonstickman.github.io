@@ -1,11 +1,11 @@
 /*!
  * script.js
- * Versão: 1.2.0
+ * Versão: 2.0.0
  * Última atualização: 31/10/2025
- * Usando UTIF.js para melhor compatibilidade com TIFF
+ * TIFF convertido usando createImageBitmap nativo do navegador
  */
 
-const SCRIPT_VERSION = "1.2.0";
+const SCRIPT_VERSION = "2.0.0";
 const MAX_IMAGENS = 10;
 const QUALIDADE_JPG = 0.8;
 
@@ -23,20 +23,8 @@ const progressoUpload = document.getElementById("progressoUpload");
 
 let linksParaDownload = [];
 let blobsParaUpload = [];
-let utifCarregado = false;
 
-// Verificar se biblioteca UTIF carregou
-window.addEventListener('load', () => {
-  setTimeout(() => {
-    utifCarregado = typeof UTIF !== "undefined";
-    if (utifCarregado) {
-      console.log("✅ Biblioteca UTIF carregada com sucesso!");
-    } else {
-      console.error("❌ Biblioteca UTIF não foi carregada.");
-      mostrarErro("Biblioteca TIFF não carregada. Arquivos .tif/.tiff não serão suportados.");
-    }
-  }, 1000);
-});
+console.log(`✅ Script carregado - Versão ${SCRIPT_VERSION}`);
 
 // Processar arquivos
 function processarArquivos(files) {
@@ -58,132 +46,113 @@ function processarArquivos(files) {
   let processadas = 0;
   const total = imagens.length;
 
-  imagens.forEach(file => {
-    const isTiff = file.name.toLowerCase().endsWith(".tif") || file.name.toLowerCase().endsWith(".tiff");
-    
-    if (isTiff && !utifCarregado) {
-      mostrarErro(`Arquivo TIFF não suportado: ${file.name}. Recarregue a página e tente novamente.`);
-      processadas++;
-      if (processadas === total) finalizarProcessamento();
-      return;
-    }
-
-    const reader = new FileReader();
-
-    reader.onload = async e => {
-      try {
-        if (isTiff) {
-          await processarTiffComUTIF(e.target.result, file.name, () => {
-            processadas++;
-            if (processadas === total) finalizarProcessamento();
-          });
-        } else {
-          await processarImagemNormal(e.target.result, file.name, () => {
-            processadas++;
-            if (processadas === total) finalizarProcessamento();
-          });
-        }
-      } catch (err) {
-        console.error(`Erro ao processar ${file.name}:`, err);
-        mostrarErro(`Erro ao processar ${file.name}: ${err.message}`);
-        processadas++;
-        if (processadas === total) finalizarProcessamento();
+  imagens.forEach(async file => {
+    try {
+      const isTiff = file.name.toLowerCase().endsWith(".tif") || file.name.toLowerCase().endsWith(".tiff");
+      
+      if (isTiff) {
+        await processarTiffNativo(file);
+      } else {
+        await processarImagemNormal(file);
       }
-    };
-
-    reader.onerror = () => {
-      mostrarErro(`Erro ao ler arquivo: ${file.name}`);
+      
       processadas++;
       if (processadas === total) finalizarProcessamento();
-    };
-
-    if (isTiff) {
-      reader.readAsArrayBuffer(file);
-    } else {
-      reader.readAsDataURL(file);
+      
+    } catch (err) {
+      console.error(`Erro ao processar ${file.name}:`, err);
+      mostrarErro(`Erro ao processar ${file.name}: ${err.message}`);
+      processadas++;
+      if (processadas === total) finalizarProcessamento();
     }
   });
 }
 
-// Processar arquivo TIFF usando UTIF.js
-async function processarTiffComUTIF(arrayBuffer, nomeOriginal, callback) {
-  return new Promise((resolve, reject) => {
-    try {
-      // Decodificar TIFF
-      const ifds = UTIF.decode(arrayBuffer);
-      UTIF.decodeImage(arrayBuffer, ifds[0]);
-      
-      const rgba = UTIF.toRGBA8(ifds[0]);
-      const width = ifds[0].width;
-      const height = ifds[0].height;
-
-      // Criar canvas e desenhar a imagem
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      
-      const imageData = ctx.createImageData(width, height);
-      imageData.data.set(rgba);
-      ctx.putImageData(imageData, 0, 0);
-
-      // Converter para JPG
+// Processar TIFF usando API nativa do navegador
+async function processarTiffNativo(file) {
+  try {
+    // Tentar usar createImageBitmap (suportado em navegadores modernos)
+    const imageBitmap = await createImageBitmap(file);
+    
+    const canvas = document.createElement("canvas");
+    canvas.width = imageBitmap.width;
+    canvas.height = imageBitmap.height;
+    const ctx = canvas.getContext("2d");
+    
+    // Fundo branco
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(imageBitmap, 0, 0);
+    
+    return new Promise((resolve, reject) => {
       canvas.toBlob(blob => {
         if (!blob) {
-          reject(new Error("Erro ao converter TIFF para JPG"));
+          reject(new Error("Erro ao converter TIFF"));
           return;
         }
-
+        
         const url = URL.createObjectURL(blob);
-        const nomeArquivo = nomeOriginal.replace(/\.[^/.]+$/, "") + ".jpg";
+        const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
         blobsParaUpload.push({ blob, nome: nomeArquivo });
-
-        const card = criarCardImagem(url, nomeArquivo, blob, width, height);
+        
+        const card = criarCardImagem(url, nomeArquivo, blob, canvas.width, canvas.height);
         downloads.appendChild(card);
         linksParaDownload.push(card.querySelector(".image-link"));
         
-        callback();
         resolve();
       }, "image/jpeg", QUALIDADE_JPG);
-
-    } catch (err) {
-      reject(err);
-    }
-  });
+    });
+    
+  } catch (err) {
+    // Se createImageBitmap falhar, tentar como imagem normal
+    console.warn("createImageBitmap falhou, tentando método alternativo...");
+    return processarImagemNormal(file);
+  }
 }
 
 // Processar imagem normal
-async function processarImagemNormal(dataUrl, nomeOriginal, callback) {
+async function processarImagemNormal(file) {
   return new Promise((resolve, reject) => {
-    const img = new Image();
+    const reader = new FileReader();
     
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext("2d");
+    reader.onload = e => {
+      const img = new Image();
       
-      // Fundo branco para transparência
-      ctx.fillStyle = "white";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0);
-
-      canvas.toBlob(blob => {
-        const url = URL.createObjectURL(blob);
-        const nomeArquivo = nomeOriginal.replace(/\.[^/.]+$/, "") + ".jpg";
-        blobsParaUpload.push({ blob, nome: nomeArquivo });
-
-        const card = criarCardImagem(url, nomeArquivo, blob, img.width, img.height);
-        downloads.appendChild(card);
-        linksParaDownload.push(card.querySelector(".image-link"));
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
         
-        callback();
-        resolve();
-      }, "image/jpeg", QUALIDADE_JPG);
+        // Fundo branco para transparência
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        
+        canvas.toBlob(blob => {
+          if (!blob) {
+            reject(new Error("Erro ao converter imagem"));
+            return;
+          }
+          
+          const url = URL.createObjectURL(blob);
+          const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+          blobsParaUpload.push({ blob, nome: nomeArquivo });
+          
+          const card = criarCardImagem(url, nomeArquivo, blob, img.width, img.height);
+          downloads.appendChild(card);
+          linksParaDownload.push(card.querySelector(".image-link"));
+          
+          resolve();
+        }, "image/jpeg", QUALIDADE_JPG);
+      };
+      
+      img.onerror = () => reject(new Error("Erro ao carregar imagem"));
+      img.src = e.target.result;
     };
-
-    img.onerror = () => reject(new Error("Erro ao carregar imagem"));
-    img.src = dataUrl;
+    
+    reader.onerror = () => reject(new Error("Erro ao ler arquivo"));
+    reader.readAsDataURL(file);
   });
 }
 
@@ -414,5 +383,3 @@ function exibirLinksPublicos(links) {
     listaLinks.appendChild(div);
   });
 }
-
-console.log(`Script carregado - Versão ${SCRIPT_VERSION}`);
