@@ -1,51 +1,66 @@
-window.addEventListener("load", () => {
-  if (typeof Tiff === "undefined") {
-    alert("Biblioteca TIFF não carregada!");
-    return;
-  }
+/*!
+ * script.js
+ * Versão: 1.0.0
+ * Última atualização: 31/10/2025
+ */
 
-  const input = document.getElementById("input");
-  const downloads = document.getElementById("downloads");
-  const btnBaixarTudo = document.getElementById("baixarTudo");
-  const btnUploadTudo = document.getElementById("uploadTudo");
-  const dropzone = document.getElementById("dropzone");
-  const instrucoes = document.getElementById("instrucoes");
-  const loading = document.getElementById("loading");
-  const linksPublicos = document.getElementById("linksPublicos");
-  const listaLinks = document.getElementById("listaLinks");
+if (typeof Tiff === "undefined") {
+  alert("Biblioteca TIFF não carregada!");
+}
 
-  let linksParaDownload = [];
-  let blobsParaUpload = [];
+const SCRIPT_VERSION = "1.0.0";
 
-  function processarArquivos(files) {
-    const imagens = Array.from(files)
-      .filter(f => f.type.startsWith("image/") || f.name.toLowerCase().endsWith(".tif") || f.name.toLowerCase().endsWith(".tiff"))
-      .slice(0,10);
+const input = document.getElementById("input");
+const downloads = document.getElementById("downloads");
+const btnBaixarTudo = document.getElementById("baixarTudo");
+const btnUploadTudo = document.getElementById("uploadTudo");
+const dropzone = document.getElementById("dropzone");
+const instrucoes = document.getElementById("instrucoes");
+const loading = document.getElementById("loading");
+const linksPublicos = document.getElementById("linksPublicos");
+const listaLinks = document.getElementById("listaLinks");
 
-    if(imagens.length===0) return;
+let linksParaDownload = [];
+let blobsParaUpload = [];
 
-    downloads.innerHTML = "";
-    linksParaDownload = [];
-    blobsParaUpload = [];
-    btnBaixarTudo.style.display = "none";
-    btnUploadTudo.style.display = "none";
-    instrucoes.style.display = "none";
-    linksPublicos.style.display = "none";
+// Processa arquivos (TIFF ou imagens normais)
+function processarArquivos(files) {
+  const imagens = Array.from(files)
+    .filter(file => file.type.startsWith("image/") || file.name.toLowerCase().endsWith(".tif") || file.name.toLowerCase().endsWith(".tiff"))
+    .slice(0, 10);
 
-    imagens.forEach(file => {
-      const reader = new FileReader();
-      const isTiff = file.name.toLowerCase().endsWith(".tif") || file.name.toLowerCase().endsWith(".tiff");
+  if (!imagens.length) return;
 
-      reader.onload = (e) => {
-        if(isTiff){
-          try{
-            const tiff = new Tiff({ buffer: e.target.result });
-            const canvas = tiff.toCanvas();
-            if(!canvas){ alert(`Erro ao abrir ${file.name}`); return; }
-            canvas.toBlob(blob => criarCard(canvas, blob, file), "image/jpeg", 0.8);
-          } catch(err){
-            alert(`Erro ao processar ${file.name}: ${err.message}`);
-          }
+  downloads.innerHTML = "";
+  linksParaDownload = [];
+  blobsParaUpload = [];
+  btnBaixarTudo.style.display = "none";
+  btnUploadTudo.style.display = "none";
+  instrucoes.style.display = "none";
+  linksPublicos.style.display = "none";
+
+  imagens.forEach(file => {
+    const reader = new FileReader();
+    const isTiff = file.name.toLowerCase().endsWith(".tif") || file.name.toLowerCase().endsWith(".tiff");
+
+    reader.onload = async e => {
+      try {
+        if (isTiff) {
+          const tiff = new Tiff({ buffer: e.target.result });
+          const canvas = tiff.toCanvas();
+          if (!canvas) throw new Error("Não foi possível abrir o arquivo TIFF.");
+
+          canvas.toBlob(blob => {
+            const url = URL.createObjectURL(blob);
+            const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+            blobsParaUpload.push({ blob, nome: nomeArquivo });
+
+            const card = criarCardImagem(url, nomeArquivo, blob, canvas.width, canvas.height);
+            downloads.appendChild(card);
+            linksParaDownload.push(card.querySelector(".image-link"));
+            if (linksParaDownload.length === imagens.length) mostrarBotoes();
+          }, "image/jpeg", 0.8);
+
         } else {
           const img = new Image();
           img.onload = () => {
@@ -54,147 +69,185 @@ window.addEventListener("load", () => {
             canvas.height = img.height;
             const ctx = canvas.getContext("2d");
             ctx.fillStyle = "white";
-            ctx.fillRect(0,0,canvas.width,canvas.height);
-            ctx.drawImage(img,0,0);
-            canvas.toBlob(blob => criarCard(canvas, blob, file), "image/jpeg", 0.8);
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+
+            canvas.toBlob(blob => {
+              const url = URL.createObjectURL(blob);
+              const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+              blobsParaUpload.push({ blob, nome: nomeArquivo });
+
+              const card = criarCardImagem(url, nomeArquivo, blob, img.width, img.height);
+              downloads.appendChild(card);
+              linksParaDownload.push(card.querySelector(".image-link"));
+              if (linksParaDownload.length === imagens.length) mostrarBotoes();
+            }, "image/jpeg", 0.8);
           };
           img.src = e.target.result;
         }
-      };
+      } catch (err) {
+        alert(`Erro ao processar ${file.name}: ${err.message}`);
+      }
+    };
 
-      if(isTiff) reader.readAsArrayBuffer(file);
-      else reader.readAsDataURL(file);
-    });
-  }
-
-  function criarCard(canvas, blob, file){
-    const url = URL.createObjectURL(blob);
-    const nomeArquivo = file.name.replace(/\.[^/.]+$/,"")+".jpg";
-    blobsParaUpload.push({ blob, nome: nomeArquivo });
-
-    const card = document.createElement("div");
-    card.className = "image-card";
-
-    const linkImagem = document.createElement("a");
-    linkImagem.href = url;
-    linkImagem.download = nomeArquivo;
-
-    const imgPreview = document.createElement("img");
-    imgPreview.src = url;
-    imgPreview.className = "image-preview";
-    linkImagem.appendChild(imgPreview);
-
-    const linkDownload = document.createElement("a");
-    linkDownload.href = url;
-    linkDownload.download = nomeArquivo;
-    linkDownload.className = "image-link";
-    linkDownload.textContent = `⬇️ ${nomeArquivo}`;
-
-    const info = document.createElement("div");
-    info.className = "image-info";
-    info.textContent = `${canvas.width}x${canvas.height} • ${(blob.size/1024).toFixed(2)} KB`;
-
-    card.appendChild(linkImagem);
-    card.appendChild(linkDownload);
-    card.appendChild(info);
-
-    downloads.appendChild(card);
-    linksParaDownload.push(linkDownload);
-
-    if(linksParaDownload.length===blobsParaUpload.length){
-      btnBaixarTudo.style.display = "inline-block";
-      btnUploadTudo.style.display = "inline-block";
-      instrucoes.style.display = "block";
-    }
-  }
-
-  // Drag & drop
-  dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
-  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
-  dropzone.addEventListener("drop", e => { 
-    e.preventDefault(); 
-    dropzone.classList.remove("dragover"); 
-    processarArquivos(e.dataTransfer.files); 
+    if (isTiff) reader.readAsArrayBuffer(file);
+    else reader.readAsDataURL(file);
   });
+}
 
-  // Input
-  input.addEventListener("change", () => processarArquivos(input.files));
+// Cria card de imagem
+function criarCardImagem(url, nomeArquivo, blob, largura, altura) {
+  const card = document.createElement("div");
+  card.className = "image-card";
 
-  // Paste
-  window.addEventListener("paste", e => {
-    const arquivos = [];
-    for(const item of e.clipboardData.items){
-      if(item.type.startsWith("image/")) arquivos.push(item.getAsFile());
-    }
-    if(arquivos.length>0) processarArquivos(arquivos);
-  });
+  const linkImagem = document.createElement("a");
+  linkImagem.href = url;
+  linkImagem.download = nomeArquivo;
 
-  // Baixar tudo
-  btnBaixarTudo.addEventListener("click", ()=> linksParaDownload.forEach((l,i)=>setTimeout(()=>l.click(),i*100)));
+  const imgPreview = document.createElement("img");
+  imgPreview.src = url;
+  imgPreview.className = "image-preview";
+  imgPreview.alt = nomeArquivo;
 
-  // Upload
-  btnUploadTudo.addEventListener("click", async () => {
-    loading.style.display = "block";
-    linksPublicos.style.display = "none";
-    listaLinks.innerHTML = "";
+  linkImagem.appendChild(imgPreview);
 
-    const API_KEY = "be2bda19e98f53801c62094133672330";
-    const linksGerados = [];
+  const linkDownload = document.createElement("a");
+  linkDownload.href = url;
+  linkDownload.download = nomeArquivo;
+  linkDownload.className = "image-link";
+  linkDownload.textContent = `⬇️ ${nomeArquivo}`;
 
-    for(let {blob,nome} of blobsParaUpload){
-      try{
-        const base64 = await blobToBase64(blob);
-        const base64Data = base64.split(",")[1];
-        const formData = new FormData();
-        formData.append("image", base64Data);
-        const res = await fetch(`https://api.imgbb.com/1/upload?key=${API_KEY}`,{method:"POST",body:formData});
-        const data = await res.json();
-        if(data.success) linksGerados.push({nome, url:data.data.url, deleteUrl:data.data.delete_url});
-      }catch(err){ console.error(err); }
-    }
+  const info = document.createElement("div");
+  info.className = "image-info";
+  const tamanhoKB = (blob.size / 1024).toFixed(2);
+  info.textContent = `${largura}x${altura} • ${tamanhoKB} KB`;
 
-    loading.style.display = "none";
-    if(linksGerados.length>0) exibirLinks(linksGerados);
-    else alert("Erro ao fazer upload.");
-  });
+  card.appendChild(linkImagem);
+  card.appendChild(linkDownload);
+  card.appendChild(info);
+  return card;
+}
 
-  function blobToBase64(blob){
-    return new Promise((res,rej)=>{
-      const r = new FileReader();
-      r.onloadend = ()=>res(r.result);
-      r.onerror = rej;
-      r.readAsDataURL(blob);
-    });
-  }
+function mostrarBotoes() {
+  btnBaixarTudo.style.display = "inline-block";
+  btnUploadTudo.style.display = "inline-block";
+  instrucoes.style.display = "block";
+}
 
-  function exibirLinks(links){
-    linksPublicos.style.display = "block";
-    listaLinks.innerHTML="";
-    links.forEach((item,i)=>{
-      const div = document.createElement("div");
-      div.className = "link-item";
-      const titulo = document.createElement("strong");
-      titulo.textContent = `${i+1}. ${item.nome}`;
-      const divLink = document.createElement("div");
-      divLink.className = "link-copiavel";
-      const inputLink = document.createElement("input");
-      inputLink.value = item.url; inputLink.readOnly=true;
-      const btnCopiar = document.createElement("button");
-      btnCopiar.textContent="📋 Copiar";
-      btnCopiar.className="btn-copiar";
-      btnCopiar.onclick=()=>{
-        inputLink.select();
-        navigator.clipboard.writeText(item.url);
-        btnCopiar.textContent="✅ Copiado!";
-        setTimeout(()=>btnCopiar.textContent="📋 Copiar",2000);
-      };
-      divLink.appendChild(inputLink); divLink.appendChild(btnCopiar);
-      const preview = document.createElement("div"); preview.className="link-preview";
-      const imgPreview = document.createElement("img"); imgPreview.src=item.url;
-      preview.appendChild(imgPreview);
-      div.appendChild(titulo); div.appendChild(divLink); div.appendChild(preview);
-      listaLinks.appendChild(div);
-    });
-  }
-
+// Drag & Drop
+dropzone.addEventListener("dragover", e => {
+  e.preventDefault();
+  dropzone.classList.add("dragover");
 });
+dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+dropzone.addEventListener("drop", e => {
+  e.preventDefault();
+  dropzone.classList.remove("dragover");
+  if (e.dataTransfer.files.length > 0) processarArquivos(e.dataTransfer.files);
+});
+
+// Input
+input.addEventListener("change", () => processarArquivos(input.files));
+
+// Ctrl+V
+window.addEventListener("paste", e => {
+  const arquivos = [];
+  for (const item of e.clipboardData.items) {
+    if (item.type.startsWith("image/")) {
+      const file = item.getAsFile();
+      if (file) arquivos.push(file);
+    }
+  }
+  if (arquivos.length > 0) processarArquivos(arquivos);
+});
+
+// Baixar tudo
+btnBaixarTudo.addEventListener("click", () => {
+  linksParaDownload.forEach((link, i) => setTimeout(() => link.click(), i * 100));
+});
+
+// Upload (IMGBB)
+btnUploadTudo.addEventListener("click", async () => {
+  loading.style.display = "block";
+  linksPublicos.style.display = "none";
+  listaLinks.innerHTML = "";
+
+  const API_KEY = "be2bda19e98f53801c62094133672330";
+  const linksGerados = [];
+
+  for (let i = 0; i < blobsParaUpload.length; i++) {
+    const { blob, nome } = blobsParaUpload[i];
+    try {
+      const base64 = await blobToBase64(blob);
+      const base64Data = base64.split(",")[1];
+      const formData = new FormData();
+      formData.append("image", base64Data);
+
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${API_KEY}`, { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.success) linksGerados.push({ nome, url: data.data.url, deleteUrl: data.data.delete_url });
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  loading.style.display = "none";
+  if (linksGerados.length) exibirLinksPublicos(linksGerados);
+  else alert("Erro ao fazer upload. Tente outro serviço.");
+});
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function exibirLinksPublicos(links) {
+  linksPublicos.style.display = "block";
+  listaLinks.innerHTML = "";
+
+  links.forEach((item, idx) => {
+    const div = document.createElement("div");
+    div.className = "link-item";
+
+    const titulo = document.createElement("strong");
+    titulo.textContent = `${idx + 1}. ${item.nome}`;
+
+    const divLink = document.createElement("div");
+    divLink.className = "link-copiavel";
+
+    const inputLink = document.createElement("input");
+    inputLink.type = "text";
+    inputLink.value = item.url;
+    inputLink.readOnly = true;
+
+    const btnCopiar = document.createElement("button");
+    btnCopiar.className = "btn-copiar";
+    btnCopiar.textContent = "📋 Copiar";
+    btnCopiar.onclick = () => {
+      inputLink.select();
+      navigator.clipboard.writeText(item.url);
+      btnCopiar.textContent = "✅ Copiado!";
+      btnCopiar.classList.add("copiado");
+      setTimeout(() => { btnCopiar.textContent = "📋 Copiar"; btnCopiar.classList.remove("copiado"); }, 2000);
+    };
+
+    divLink.appendChild(inputLink);
+    divLink.appendChild(btnCopiar);
+
+    const preview = document.createElement("div");
+    preview.className = "link-preview";
+    const imgPreview = document.createElement("img");
+    imgPreview.src = item.url;
+    preview.appendChild(imgPreview);
+
+    div.appendChild(titulo);
+    div.appendChild(divLink);
+    div.appendChild(preview);
+
+    listaLinks.appendChild(div);
+  });
+}
