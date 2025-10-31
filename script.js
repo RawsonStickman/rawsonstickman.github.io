@@ -1,11 +1,11 @@
 /*!
  * script.js
- * Versão: 2.0.0
+ * Versão: 2.1.0
  * Última atualização: 31/10/2025
- * TIFF convertido usando createImageBitmap nativo do navegador
+ * Usando UTIF.js local para processar TIFF
  */
 
-const SCRIPT_VERSION = "2.0.0";
+const SCRIPT_VERSION = "2.1.0";
 const MAX_IMAGENS = 10;
 const QUALIDADE_JPG = 0.8;
 
@@ -23,6 +23,18 @@ const progressoUpload = document.getElementById("progressoUpload");
 
 let linksParaDownload = [];
 let blobsParaUpload = [];
+
+// Verificar biblioteca UTIF
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    if (typeof UTIF !== 'undefined') {
+      console.log("✅ Biblioteca UTIF carregada com sucesso!");
+    } else {
+      console.error("❌ Biblioteca UTIF não foi carregada.");
+      mostrarErro("Erro: UTIF.js não encontrado. Certifique-se de que o arquivo existe na mesma pasta.");
+    }
+  }, 500);
+});
 
 console.log(`✅ Script carregado - Versão ${SCRIPT_VERSION}`);
 
@@ -51,7 +63,10 @@ function processarArquivos(files) {
       const isTiff = file.name.toLowerCase().endsWith(".tif") || file.name.toLowerCase().endsWith(".tiff");
       
       if (isTiff) {
-        await processarTiffNativo(file);
+        if (typeof UTIF === 'undefined') {
+          throw new Error("Biblioteca UTIF não carregada. Coloque o arquivo UTIF.js na mesma pasta.");
+        }
+        await processarTiffComUTIF(file);
       } else {
         await processarImagemNormal(file);
       }
@@ -68,46 +83,60 @@ function processarArquivos(files) {
   });
 }
 
-// Processar TIFF usando API nativa do navegador
-async function processarTiffNativo(file) {
-  try {
-    // Tentar usar createImageBitmap (suportado em navegadores modernos)
-    const imageBitmap = await createImageBitmap(file);
+// Processar TIFF usando UTIF
+async function processarTiffComUTIF(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
     
-    const canvas = document.createElement("canvas");
-    canvas.width = imageBitmap.width;
-    canvas.height = imageBitmap.height;
-    const ctx = canvas.getContext("2d");
-    
-    // Fundo branco
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(imageBitmap, 0, 0);
-    
-    return new Promise((resolve, reject) => {
-      canvas.toBlob(blob => {
-        if (!blob) {
-          reject(new Error("Erro ao converter TIFF"));
-          return;
-        }
+    reader.onload = e => {
+      try {
+        const arrayBuffer = e.target.result;
         
-        const url = URL.createObjectURL(blob);
-        const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
-        blobsParaUpload.push({ blob, nome: nomeArquivo });
+        // Decodificar TIFF
+        const ifds = UTIF.decode(arrayBuffer);
+        UTIF.decodeImage(arrayBuffer, ifds[0]);
         
-        const card = criarCardImagem(url, nomeArquivo, blob, canvas.width, canvas.height);
-        downloads.appendChild(card);
-        linksParaDownload.push(card.querySelector(".image-link"));
+        const rgba = UTIF.toRGBA8(ifds[0]);
+        const width = ifds[0].width;
+        const height = ifds[0].height;
+
+        // Criar canvas
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
         
-        resolve();
-      }, "image/jpeg", QUALIDADE_JPG);
-    });
+        // Converter RGBA para ImageData
+        const imageData = ctx.createImageData(width, height);
+        imageData.data.set(rgba);
+        ctx.putImageData(imageData, 0, 0);
+
+        // Converter para JPG
+        canvas.toBlob(blob => {
+          if (!blob) {
+            reject(new Error("Erro ao converter TIFF para JPG"));
+            return;
+          }
+
+          const url = URL.createObjectURL(blob);
+          const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+          blobsParaUpload.push({ blob, nome: nomeArquivo });
+
+          const card = criarCardImagem(url, nomeArquivo, blob, width, height);
+          downloads.appendChild(card);
+          linksParaDownload.push(card.querySelector(".image-link"));
+          
+          resolve();
+        }, "image/jpeg", QUALIDADE_JPG);
+
+      } catch (err) {
+        reject(err);
+      }
+    };
     
-  } catch (err) {
-    // Se createImageBitmap falhar, tentar como imagem normal
-    console.warn("createImageBitmap falhou, tentando método alternativo...");
-    return processarImagemNormal(file);
-  }
+    reader.onerror = () => reject(new Error("Erro ao ler arquivo TIFF"));
+    reader.readAsArrayBuffer(file);
+  });
 }
 
 // Processar imagem normal
