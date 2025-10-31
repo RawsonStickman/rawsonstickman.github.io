@@ -9,24 +9,26 @@
 <body>
   <h1>Conversor de Imagens para JPG (80%)</h1>
   <p>Selecione até 10 imagens, arraste para a área ou cole com Ctrl+V:</p>
-
+  
   <div id="dropzone">Arraste ou cole imagens aqui</div>
-  <input type="file" id="input" accept="image/*" multiple>
+  <input type="file" id="input" accept="image/*,.tif,.tiff" multiple>
   
   <div class="downloads" id="downloads"></div>
+  
   <button id="baixarTudo" style="display:none;">Baixar Tudo</button>
   <button id="uploadTudo" style="display:none;">📤 Fazer Upload e Gerar Links</button>
-
+  
   <div class="loading" id="loading" style="display:none;">
     <div class="spinner"></div>
     <p>Fazendo upload das imagens...</p>
+    <div id="progressoUpload"></div>
   </div>
-
+  
   <div class="links-publicos" id="linksPublicos" style="display:none;">
     <h3>🔗 Links Públicos</h3>
     <div id="listaLinks"></div>
   </div>
-
+  
   <div class="instrucoes" id="instrucoes" style="display:none;">
     <h3>📌 Como usar:</h3>
     <ol>
@@ -36,10 +38,10 @@
     </ol>
   </div>
 
-  <!-- Biblioteca TIFF (versão fixa) -->
-  <script src="https://cdn.jsdelivr.net/npm/tiff@0.16.0/dist/tiff.min.js"></script>
-
+  <!-- Biblioteca TIFF.js (corrigida) -->
+  <script src="https://cdn.jsdelivr.net/npm/tiff.js@0.0.4/tiff.min.js"></script>
+  
   <!-- Script principal -->
-  <script src="script.js" defer></script>
+  <script src="script.js"></script>
 </body>
 </html>
