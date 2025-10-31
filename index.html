@@ -41,44 +41,10 @@
     </div>
   </div>
 
-  <!-- Importa a biblioteca tiff.js -->
+  <!-- Biblioteca TIFF -->
   <script src="https://cdn.jsdelivr.net/npm/tiff@0.16.0/dist/tiff.min.js"></script>
 
-  <script>
-    const input = document.getElementById('input');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-
-    input.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      try {
-        // Lê o arquivo como ArrayBuffer
-        const arrayBuffer = await file.arrayBuffer();
-
-        // Cria o objeto TIFF
-        const tiff = new Tiff({ buffer: arrayBuffer });
-
-        // Pega a primeira página (TIFFs podem ter várias)
-        const image = tiff.toCanvas();
-
-        // Ajusta o tamanho do canvas e desenha a imagem
-        canvas.width = image.width;
-        canvas.height = image.height;
-        ctx.drawImage(image, 0, 0);
-      } catch (err) {
-        alert('Erro ao processar o arquivo TIFF: ' + err.message);
-        console.error(err);
-      }
-    });
-  </script>
-  
+  <!-- Script principal -->
   <script src="script.js"></script>
 </body>
 </html>
-
-
-
-
-
