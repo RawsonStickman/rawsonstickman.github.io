@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Conversor PNG → JPG 80% + Upload</title>
-  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,36 +14,32 @@
   <input type="file" id="input" accept="image/*" multiple>
   
   <div class="downloads" id="downloads"></div>
-  <button id="baixarTudo" style="display: none;">Baixar Tudo</button>
-  <button id="uploadTudo" style="display: none;">📤 Fazer Upload e Gerar Links</button>
+  <button id="baixarTudo" style="display:none;">Baixar Tudo</button>
+  <button id="uploadTudo" style="display:none;">📤 Fazer Upload e Gerar Links</button>
 
-  <div class="loading" id="loading" style="display: none;">
+  <div class="loading" id="loading" style="display:none;">
     <div class="spinner"></div>
     <p>Fazendo upload das imagens...</p>
   </div>
 
-  <div class="links-publicos" id="linksPublicos" style="display: none;">
-    <h3>🔗 Links Públicos (Use no ChatGPT)</h3>
+  <div class="links-publicos" id="linksPublicos" style="display:none;">
+    <h3>🔗 Links Públicos</h3>
     <div id="listaLinks"></div>
   </div>
 
-  <div class="instrucoes" id="instrucoes" style="display: none;">
-    <h3>📌 Como usar os links no ChatGPT:</h3>
+  <div class="instrucoes" id="instrucoes" style="display:none;">
+    <h3>📌 Como usar:</h3>
     <ol>
-      <li>Clique no botão <strong>"📤 Fazer Upload e Gerar Links"</strong></li>
-      <li>Aguarde o upload das imagens</li>
-      <li>Copie os links públicos gerados</li>
-      <li>Cole os links no ChatGPT - eles funcionarão! ✅</li>
+      <li>Clique em "Fazer Upload e Gerar Links"</li>
+      <li>Aguarde o upload</li>
+      <li>Copie os links gerados</li>
     </ol>
-    <div class="aviso">
-      ⚠️ <strong>Importante:</strong> Os links gerados são públicos e ficam disponíveis por tempo limitado (geralmente 24h-30 dias dependendo do serviço).
-    </div>
   </div>
 
   <!-- Biblioteca TIFF -->
   <script src="https://cdn.jsdelivr.net/npm/tiff@0.16.0/dist/tiff.min.js"></script>
 
   <!-- Script principal -->
-  <script src="script.js"></script>
+  <script src="script.js?v=2" defer></script>
 </body>
 </html>
