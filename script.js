@@ -1,6 +1,3 @@
-// Importante: no HTML, adicione antes deste script:
-// <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js"></script>
-
 const input = document.getElementById("input");
 const downloads = document.getElementById("downloads");
 const btnBaixarTudo = document.getElementById("baixarTudo");
@@ -15,9 +12,13 @@ let linksParaDownload = [];
 let blobsParaUpload = [];
 
 function processarArquivos(files) {
-  const imagens = Array.from(files).filter(file =>
-    file.type.startsWith("image/") || file.name.toLowerCase().endsWith(".tif") || file.name.toLowerCase().endsWith(".tiff")
-  ).slice(0, 10);
+  const imagens = Array.from(files)
+    .filter(file =>
+      file.type.startsWith("image/") ||
+      file.name.toLowerCase().endsWith(".tif") ||
+      file.name.toLowerCase().endsWith(".tiff")
+    )
+    .slice(0, 10);
 
   if (imagens.length === 0) return;
 
@@ -29,75 +30,61 @@ function processarArquivos(files) {
   instrucoes.style.display = "none";
   linksPublicos.style.display = "none";
 
-  imagens.forEach((file, index) => {
+  imagens.forEach((file) => {
     const reader = new FileReader();
+    const isTiff = file.name.toLowerCase().endsWith(".tif") || file.name.toLowerCase().endsWith(".tiff");
+
     reader.onload = (e) => {
       const buffer = e.target.result;
-
-      // Detectar se é TIFF
-      const isTiff = file.name.toLowerCase().endsWith(".tif") || file.name.toLowerCase().endsWith(".tiff");
 
       if (isTiff) {
         try {
           const tiff = new Tiff({ buffer });
           const canvas = tiff.toCanvas();
-          if (canvas) {
-            canvas.toBlob((blob) => {
-              const url = URL.createObjectURL(blob);
-              const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
-
-              blobsParaUpload.push({ blob, nome: nomeArquivo });
-              
-              const card = criarCardImagem(url, nomeArquivo, blob, canvas.width, canvas.height);
-              downloads.appendChild(card);
-              linksParaDownload.push(card.querySelector(".image-link"));
-
-              if (linksParaDownload.length === imagens.length) {
-                btnBaixarTudo.style.display = "inline-block";
-                btnUploadTudo.style.display = "inline-block";
-                instrucoes.style.display = "block";
-              }
-            }, "image/jpeg", 0.8);
-          } else {
+          if (!canvas) {
             alert(`Não foi possível abrir o arquivo ${file.name}. Pode estar corrompido ou usar compressão não suportada.`);
+            return;
           }
+          canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+
+            blobsParaUpload.push({ blob, nome: nomeArquivo });
+            const card = criarCardImagem(url, nomeArquivo, blob, canvas.width, canvas.height);
+            downloads.appendChild(card);
+            linksParaDownload.push(card.querySelector(".image-link"));
+
+            if (linksParaDownload.length === imagens.length) mostrarBotoes();
+          }, "image/jpeg", 0.8);
         } catch (err) {
           alert(`Erro ao processar ${file.name}: ${err.message}`);
         }
       } else {
-        // Processamento normal para PNG/JPG
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement("canvas");
           canvas.width = img.width;
           canvas.height = img.height;
           const ctx = canvas.getContext("2d");
-
           ctx.fillStyle = "white";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0);
-
           canvas.toBlob((blob) => {
             const url = URL.createObjectURL(blob);
             const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
-
             blobsParaUpload.push({ blob, nome: nomeArquivo });
-
             const card = criarCardImagem(url, nomeArquivo, blob, img.width, img.height);
             downloads.appendChild(card);
             linksParaDownload.push(card.querySelector(".image-link"));
-
-            if (linksParaDownload.length === imagens.length) {
-              btnBaixarTudo.style.display = "inline-block";
-              btnUploadTudo.style.display = "inline-block";
-              instrucoes.style.display = "block";
-            }
+            if (linksParaDownload.length === imagens.length) mostrarBotoes();
           }, "image/jpeg", 0.8);
         };
         img.src = e.target.result;
       }
     };
-    reader.readAsArrayBuffer(file); // importante: TIFF precisa de ArrayBuffer
+
+    if (isTiff) reader.readAsArrayBuffer(file);
+    else reader.readAsDataURL(file);
   });
 }
 
@@ -130,7 +117,6 @@ function criarCardImagem(url, nomeArquivo, blob, largura, altura) {
   card.appendChild(linkImagem);
   card.appendChild(linkDownload);
   card.appendChild(info);
-
   return card;
 }
 
