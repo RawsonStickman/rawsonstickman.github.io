@@ -102,6 +102,7 @@ input[type="file"] {
   transition: background 0.3s;
   color: #666;
   border-radius: 10px;
+  cursor: pointer;
 }
 
 #dropzone.dragover {
@@ -138,15 +139,6 @@ input[type="file"] {
   color: #664d03;
 }
 
-.aviso {
-  background: #fff;
-  padding: 15px;
-  border-radius: 5px;
-  margin-top: 15px;
-  border-left: 4px solid #ff6b6b;
-  color: #721c24;
-}
-
 .loading {
   margin: 30px auto;
   padding: 30px;
@@ -169,6 +161,12 @@ input[type="file"] {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+#progressoUpload {
+  margin-top: 15px;
+  font-size: 14px;
+  color: #666;
 }
 
 .links-publicos {
@@ -241,4 +239,13 @@ input[type="file"] {
   max-width: 200px;
   border-radius: 5px;
   border: 2px solid #ddd;
+}
+
+.erro-msg {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 10px;
+  border-radius: 5px;
+  margin: 10px 0;
+  border-left: 4px solid #f5c6cb;
 }
