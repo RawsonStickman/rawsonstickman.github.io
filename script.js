@@ -32,154 +32,107 @@ function processarArquivos(files) {
 
   imagens.forEach((file) => {
     const reader = new FileReader();
+    const isTiff = file.name.toLowerCase().endsWith(".tif") || file.name.toLowerCase().endsWith(".tiff");
 
-    // Caso seja TIFF/TIF
-    if (file.name.toLowerCase().endsWith(".tif") || file.name.toLowerCase().endsWith(".tiff")) {
-      reader.onload = (e) => {
+    reader.onload = (e) => {
+      const buffer = e.target.result;
+
+      if (isTiff) {
         try {
-          const buffer = e.target.result;
-          const ifds = UTIF.decode(buffer);
-          if (!ifds || ifds.length === 0) throw new Error("TIFF inválido");
-          UTIF.decodeImages(buffer, ifds);
-          const first = ifds[0];
-          const rgba = UTIF.toRGBA8(first);
-
-          const canvas = document.createElement("canvas");
-          canvas.width = first.width;
-          canvas.height = first.height;
-          const ctx = canvas.getContext("2d");
-          const imageData = ctx.createImageData(first.width, first.height);
-          imageData.data.set(rgba);
-          ctx.putImageData(imageData, 0, 0);
-
+          const tiff = new Tiff({ buffer });
+          const canvas = tiff.toCanvas();
+          if (!canvas) {
+            alert(`Não foi possível abrir o arquivo ${file.name}. Pode estar corrompido ou usar compressão não suportada.`);
+            return;
+          }
           canvas.toBlob((blob) => {
-            if (!blob) {
-              alert("Falha ao converter TIFF. Tente outro arquivo.");
-              return;
-            }
-
             const url = URL.createObjectURL(blob);
             const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+
             blobsParaUpload.push({ blob, nome: nomeArquivo });
-
-            const card = document.createElement("div");
-            card.className = "image-card";
-
-            const linkImagem = document.createElement("a");
-            linkImagem.href = url;
-            linkImagem.download = nomeArquivo;
-
-            const imgPreview = document.createElement("img");
-            imgPreview.src = url;
-            imgPreview.className = "image-preview";
-            imgPreview.alt = nomeArquivo;
-            linkImagem.appendChild(imgPreview);
-
-            const linkDownload = document.createElement("a");
-            linkDownload.href = url;
-            linkDownload.download = nomeArquivo;
-            linkDownload.className = "image-link";
-            linkDownload.textContent = `⬇️ ${nomeArquivo}`;
-
-            const info = document.createElement("div");
-            info.className = "image-info";
-            const tamanhoKB = (blob.size / 1024).toFixed(2);
-            info.textContent = `${canvas.width}x${canvas.height} • ${tamanhoKB} KB`;
-
-            card.appendChild(linkImagem);
-            card.appendChild(linkDownload);
-            card.appendChild(info);
+            const card = criarCardImagem(url, nomeArquivo, blob, canvas.width, canvas.height);
             downloads.appendChild(card);
+            linksParaDownload.push(card.querySelector(".image-link"));
 
-            linksParaDownload.push(linkDownload);
-
-            if (linksParaDownload.length === imagens.length) {
-              btnBaixarTudo.style.display = "inline-block";
-              btnUploadTudo.style.display = "inline-block";
-              instrucoes.style.display = "block";
-            }
-          }, "image/jpeg", 0.85);
+            if (linksParaDownload.length === imagens.length) mostrarBotoes();
+          }, "image/jpeg", 0.8);
         } catch (err) {
-          console.error("Erro ao decodificar TIFF:", err);
-          alert("Não foi possível abrir o arquivo TIFF. Pode estar corrompido ou usar compressão não suportada.");
+          alert(`Erro ao processar ${file.name}: ${err.message}`);
         }
-      };
-      reader.readAsArrayBuffer(file);
-
-    } else {
-      // Padrão: PNG, JPG, etc.
-      reader.onload = (e) => {
+      } else {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement("canvas");
           canvas.width = img.width;
           canvas.height = img.height;
           const ctx = canvas.getContext("2d");
-
           ctx.fillStyle = "white";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0);
-
           canvas.toBlob((blob) => {
             const url = URL.createObjectURL(blob);
             const nomeArquivo = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
-
             blobsParaUpload.push({ blob, nome: nomeArquivo });
-
-            const card = document.createElement("div");
-            card.className = "image-card";
-
-            const linkImagem = document.createElement("a");
-            linkImagem.href = url;
-            linkImagem.download = nomeArquivo;
-
-            const imgPreview = document.createElement("img");
-            imgPreview.src = url;
-            imgPreview.className = "image-preview";
-            imgPreview.alt = nomeArquivo;
-
-            linkImagem.appendChild(imgPreview);
-
-            const linkDownload = document.createElement("a");
-            linkDownload.href = url;
-            linkDownload.download = nomeArquivo;
-            linkDownload.className = "image-link";
-            linkDownload.textContent = `⬇️ ${nomeArquivo}`;
-
-            const info = document.createElement("div");
-            info.className = "image-info";
-            const tamanhoKB = (blob.size / 1024).toFixed(2);
-            info.textContent = `${img.width}x${img.height} • ${tamanhoKB} KB`;
-
-            card.appendChild(linkImagem);
-            card.appendChild(linkDownload);
-            card.appendChild(info);
-
+            const card = criarCardImagem(url, nomeArquivo, blob, img.width, img.height);
             downloads.appendChild(card);
-            linksParaDownload.push(linkDownload);
-
-            if (linksParaDownload.length === imagens.length) {
-              btnBaixarTudo.style.display = "inline-block";
-              btnUploadTudo.style.display = "inline-block";
-              instrucoes.style.display = "block";
-            }
+            linksParaDownload.push(card.querySelector(".image-link"));
+            if (linksParaDownload.length === imagens.length) mostrarBotoes();
           }, "image/jpeg", 0.8);
         };
         img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
+      }
+    };
+
+    if (isTiff) reader.readAsArrayBuffer(file);
+    else reader.readAsDataURL(file);
   });
 }
 
-// Upload no imgbb
+function criarCardImagem(url, nomeArquivo, blob, largura, altura) {
+  const card = document.createElement("div");
+  card.className = "image-card";
+
+  const linkImagem = document.createElement("a");
+  linkImagem.href = url;
+  linkImagem.download = nomeArquivo;
+
+  const imgPreview = document.createElement("img");
+  imgPreview.src = url;
+  imgPreview.className = "image-preview";
+  imgPreview.alt = nomeArquivo;
+
+  linkImagem.appendChild(imgPreview);
+
+  const linkDownload = document.createElement("a");
+  linkDownload.href = url;
+  linkDownload.download = nomeArquivo;
+  linkDownload.className = "image-link";
+  linkDownload.textContent = `⬇️ ${nomeArquivo}`;
+
+  const info = document.createElement("div");
+  info.className = "image-info";
+  const tamanhoKB = (blob.size / 1024).toFixed(2);
+  info.textContent = `${largura}x${altura} • ${tamanhoKB} KB`;
+
+  card.appendChild(linkImagem);
+  card.appendChild(linkDownload);
+  card.appendChild(info);
+  return card;
+}
+
+function mostrarBotoes() {
+  btnBaixarTudo.style.display = "inline-block";
+  btnUploadTudo.style.display = "inline-block";
+  instrucoes.style.display = "block";
+}
+
+// Upload para imgbb
 async function fazerUploadImagens() {
   loading.style.display = "block";
   linksPublicos.style.display = "none";
   listaLinks.innerHTML = "";
 
-  const API_KEY = "be2bda19e98f53801c62094133672330"; // sua chave
-
+  const API_KEY = "be2bda19e98f53801c62094133672330"; 
   const linksGerados = [];
 
   for (let i = 0; i < blobsParaUpload.length; i++) {
@@ -189,22 +142,17 @@ async function fazerUploadImagens() {
       const base64Data = base64.split(',')[1];
       const formData = new FormData();
       formData.append('image', base64Data);
-
       const response = await fetch(`https://api.imgbb.com/1/upload?key=${API_KEY}`, {
         method: 'POST',
         body: formData
       });
-
       const data = await response.json();
-
       if (data.success) {
         linksGerados.push({
-          nome: nome,
+          nome,
           url: data.data.url,
           deleteUrl: data.data.delete_url
         });
-      } else {
-        console.error('Erro no upload:', data);
       }
     } catch (error) {
       console.error('Erro ao fazer upload:', error);
@@ -212,15 +160,10 @@ async function fazerUploadImagens() {
   }
 
   loading.style.display = "none";
-
-  if (linksGerados.length > 0) {
-    exibirLinksPublicos(linksGerados);
-  } else {
-    alert('Erro ao fazer upload. Tente outro serviço de hospedagem de imagens.');
-  }
+  if (linksGerados.length > 0) exibirLinksPublicos(linksGerados);
+  else alert('Erro ao fazer upload. Tente outro serviço como imgur.com.');
 }
 
-// Converter blob para base64
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -230,10 +173,8 @@ function blobToBase64(blob) {
   });
 }
 
-// Exibir links públicos
 function exibirLinksPublicos(links) {
   linksPublicos.style.display = "block";
-
   links.forEach((item, index) => {
     const div = document.createElement("div");
     div.className = "link-item";
@@ -279,18 +220,23 @@ function exibirLinksPublicos(links) {
   });
 }
 
-// Eventos
 input.addEventListener("change", () => processarArquivos(input.files));
+
 btnBaixarTudo.addEventListener("click", () => {
   linksParaDownload.forEach((link, index) => setTimeout(() => link.click(), index * 100));
 });
+
 btnUploadTudo.addEventListener("click", () => fazerUploadImagens());
 
 dropzone.addEventListener("dragover", (e) => {
   e.preventDefault();
   dropzone.classList.add("dragover");
 });
-dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+
+dropzone.addEventListener("dragleave", () => {
+  dropzone.classList.remove("dragover");
+});
+
 dropzone.addEventListener("drop", (e) => {
   e.preventDefault();
   dropzone.classList.remove("dragover");
